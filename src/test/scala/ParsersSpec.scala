@@ -1,5 +1,6 @@
 package co.sortalon.fcon
 
+import Parsers.Parsed
 import AST._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.prop.PropertyChecks
