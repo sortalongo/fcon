@@ -7,30 +7,42 @@ object AST {
   trait Stage
 
   sealed trait Node[S <: Stage] {
+    def stage: S
     def children: List[Node[S]]
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]): Node[T]
   }
 
   sealed trait Terminal[S <: Stage] extends Node[S] {
     def children = Nil
   }
-  case class Sym[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S]
-  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S]
+  case class Sym[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S] {
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) = copy()(stage2)
+  }
+  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S] {
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) = copy()(stage2)
+  }
 
   case class Lst[S <: Stage](
     elems: List[Node[S]]
   )(implicit val stage: S
   ) extends Node[S] {
     def children = elems
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
+      copy(elems map f)(stage2)
   }
 
   case class Pair[S <: Stage](key: Str[S], value: Node[S]) extends Node[S] {
     def children = List(key, value)
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
+      copy(f(key), f(value))(stage2)
   }
   case class Dict[S <: Stage](
     pairs: List[Pair[S]]
   )(implicit val stage: S
   ) extends Node[S] {
     def children = pairs
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
+      copy(pairs map f)(stage2)
   }
 
   case class Func[S <: Stage](
@@ -39,6 +51,8 @@ object AST {
   )(implicit val stage: S
   ) extends Node[S] {
     def children = body :: args
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
+      copy(args map f, f(body))(stage2)
   }
 
   case class Merged[S <: Stage](
@@ -46,6 +60,8 @@ object AST {
   )(implicit val stage: S
   ) extends Node[S] {
     def children = nodes
+    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
+      copy(nodes map f)(stage2)
   }
 }
 
