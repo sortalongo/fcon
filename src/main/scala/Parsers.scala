@@ -6,30 +6,47 @@ import scala.util.{Try, Success => Return, Failure => Throw}
 object AST {
   trait Stage
 
-  sealed trait Node[S <: Stage]
-  case class Sym[S <: Stage](s: String)(implicit val stage: S) extends Node[S]
-  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Node[S]
+  sealed trait Node[S <: Stage] {
+    def children: List[Node[S]]
+  }
+
+  sealed trait Terminal[S <: Stage] extends Node[S] {
+    def children = Nil
+  }
+  case class Sym[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S]
+  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S]
 
   case class Lst[S <: Stage](
     elems: List[Node[S]]
   )(implicit val stage: S
-  ) extends Node[S]
+  ) extends Node[S] {
+    def children = elems
+  }
 
+  case class Pair[S <: Stage](key: Str[S], value: Node[S]) extends Node[S] {
+    def children = List(key, value)
+  }
   case class Dict[S <: Stage](
-    pairs: List[(Str[S], Node[S])]
+    pairs: List[Pair[S]]
   )(implicit val stage: S
-  ) extends Node[S]
+  ) extends Node[S] {
+    def children = pairs
+  }
 
   case class Func[S <: Stage](
     args: List[Str[S]],
     body: Node[S]
   )(implicit val stage: S
-  ) extends Node[S]
+  ) extends Node[S] {
+    def children = body :: args
+  }
 
   case class Merged[S <: Stage](
     nodes: List[Node[S]]
   )(implicit val stage: S
-  ) extends Node[S]
+  ) extends Node[S] {
+    def children = nodes
+  }
 }
 
 object Parsers {
@@ -70,8 +87,8 @@ class Parsers extends RegexParsers {
   def sym: Parser[Sym[P]] = "`" ~> "[^`]*".r <~ "`" ^^ { Sym(_) }
   def list: Parser[Lst[P]] = "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
   def dict: Parser[Dict[P]] = "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
-  def pair: Parser[(Str[P], Node[P])] = string ~ (s ~> ":" ~> s ~> expr) ^^ {
-    case key ~ value => (key, value)
+  def pair: Parser[Pair[P]] = string ~ (s ~> ":" ~> s ~> expr) ^^ {
+    case key ~ value => Pair(key, value)
   }
   def func: Parser[Func[P]] =
     ( "(" ~> rep1sep( s ~> string, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {

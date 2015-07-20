@@ -37,8 +37,8 @@ class ParsersSpec extends FlatSpec
     val eg = " { foo: too, bar: har } "
     val ast = parser(eg).get
     ast shouldEqual Dict(
-      Str("foo") -> Str("too") ::
-        Str("bar") -> Str("har") :: Nil
+      Pair(Str("foo"), Str("too")) ::
+        Pair(Str("bar"), Str("har")) :: Nil
     )
   }
 
@@ -65,8 +65,8 @@ class ParsersSpec extends FlatSpec
         ) ::
         Merged(
           Dict(
-            Str("foo") -> Str("too") ::
-              Str("bar") -> Str("har") :: Nil
+            Pair(Str("foo"), Str("too")) ::
+              Pair(Str("bar"), Str("har")) :: Nil
           ) :: Str("plus") :: Nil
         ) :: Nil
     )
