@@ -32,7 +32,7 @@ class ParsersSpec extends FlatSpec
     ast shouldEqual Lst(1 to 3 map { i => Str(i.toString) } toList)
   }
 
-  it should "correctly parse a dict" in {
+  it should "parse a dict" in {
     val eg = " { foo: too, bar: har } "
     val ast = parser(eg).get
     ast shouldEqual Dict(
@@ -41,10 +41,19 @@ class ParsersSpec extends FlatSpec
     )
   }
 
-  it should "correctly parse this example" in {
+  it should "parse a function" in {
+    val eg = "(x,y, z: `x` `y` `z`) "
+    val ast = parser(eg).get
+    ast shouldEqual Func(
+      List(Str("x"), Str("y"), Str("z")),
+      Merged(List(Sym("x"), Sym("y"), Sym("z")))
+    )
+  }
+
+  it should "obey order of operations with parens" in {
     val eg = """
       [ 1, 2, 3] (arg1, arg2: `arg2` `arg1`)
-      { foo: too, bar: har } plus
+      ({ foo: too, bar: har } plus)
     """
     val ast = parser(eg).get
     ast shouldEqual Merged(
@@ -53,12 +62,12 @@ class ParsersSpec extends FlatSpec
           Str("arg1") :: Str("arg2") :: Nil,
           Merged(Sym("arg2") :: Sym("arg1") :: Nil)
         ) ::
-        Dict(
-          Str("foo") -> Str("too") ::
-          Str("bar") -> Str("har") :: Nil
-        ) ::
-        Str("plus") ::
-        Nil
+        Merged(
+          Dict(
+            Str("foo") -> Str("too") ::
+              Str("bar") -> Str("har") :: Nil
+          ) :: Str("plus") :: Nil
+        ) :: Nil
     )
   }
 
