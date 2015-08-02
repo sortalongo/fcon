@@ -37,18 +37,19 @@ class ParsersSpec extends FlatSpec
     val eg = " { foo: too, bar: har } "
     val ast = parser(eg).get
     ast shouldEqual Dict(
-      Pair(Str("foo"), Str("too")) ::
-        Pair(Str("bar"), Str("har")) :: Nil
+      Pair(Sym.Atom("foo"), Str("too")) ::
+        Pair(Sym.Atom("bar"), Str("har")) :: Nil
     )
   }
 
   it should "parse a function" in {
     val eg = "(x,y, z: `x` `y` `z`) "
     val ast = parser(eg).get
-    ast shouldEqual Func(
-      List(Str("x"), Str("y"), Str("z")),
-      Merged(List(Sym("x"), Sym("y"), Sym("z")))
-    )
+    ast shouldEqual Func.Base(Str("x"),
+      Func.Base(Str("y"),
+        Func.Base(Str("z"),
+          Merged(List(Sym("x"), Sym("y"), Sym("z")))
+        )))
   }
 
   it should "obey order of operations with parens" in {
@@ -59,14 +60,14 @@ class ParsersSpec extends FlatSpec
     val ast = parser(eg).get
     ast shouldEqual Merged(
       Lst(1 to 3 map { i => Str(i.toString) } toList) ::
-        Func(
-          Str("arg1") :: Str("arg2") :: Nil,
-          Merged(Sym("arg2") :: Sym("arg1") :: Nil)
-        ) ::
+        Func.Base(Str("arg1"),
+          Func.Base(Str("arg2"),
+            Merged(Sym("arg2") :: Sym("arg1") :: Nil)
+        )) ::
         Merged(
           Dict(
-            Pair(Str("foo"), Str("too")) ::
-              Pair(Str("bar"), Str("har")) :: Nil
+            Pair(Sym.Atom("foo"), Str("too")) ::
+            Pair(Sym.Atom("bar"), Str("har")) :: Nil
           ) :: Str("plus") :: Nil
         ) :: Nil
     )

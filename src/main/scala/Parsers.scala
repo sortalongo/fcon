@@ -17,6 +17,12 @@ object AST {
     val stage = Parsed
   }
   object Sym {
+    def apply(s: String*) = s match {
+      case Seq(atom) => Atom(atom)
+      case scoped => scoped.init.foldRight(Atom(scoped.last): Sym) {
+        case (part, chain) => Scoped(Atom(part), chain)
+      }
+    }
     case class Atom(s: String) extends Sym
     case class Scoped(s1: Atom, ss: Sym) extends Sym
   }
@@ -99,11 +105,7 @@ class Parsers extends RegexParsers {
 
   def atom: Parser[Node[P]] = list | dict | func | string | sym
 
-  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]*".r, ".") <~ "`" ^^ {
-    parts => parts.init.foldRight(Sym.Atom(parts.last): Sym) {
-      (part, chain) => Sym.Scoped(Sym.Atom(part), chain)
-    }
-  }
+  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]*".r, ".") <~ "`" ^^ { Sym(_: _*) }
 
   def list: Parser[Lst[P]] = "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
   def dict: Parser[Dict[P]] = "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
@@ -113,8 +115,8 @@ class Parsers extends RegexParsers {
   def func: Parser[Func[P, P]] =
     ( "(" ~> rep1sep( s ~> string, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
       case args ~ body =>
-        args.init.foldLeft(Func.Base(args.last, body)) {
-          case (f, argI) => Func.Base(argI, f)
+        args.init.foldRight(Func.Base(args.last, body)) {
+          case (arg, f) => Func.Base(arg, f)
         }
     }
 
