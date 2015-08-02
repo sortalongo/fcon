@@ -1,5 +1,6 @@
 package co.sortalon.fcon
 
+import Parsers.{P, Parsed}
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.{Try, Success => Return, Failure => Throw}
 
@@ -8,61 +9,59 @@ object AST {
 
   sealed trait Node[S <: Stage] {
     def stage: S
-    def children: List[Node[S]]
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]): Node[T]
   }
 
-  sealed trait Terminal[S <: Stage] extends Node[S] {
-    def children = Nil
+  sealed trait Terminal[S <: Stage] extends Node[S]
+
+  sealed trait Sym extends Terminal[P] {
+    val stage = Parsed
   }
-  case class Sym[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S] {
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) = copy()(stage2)
+  object Sym {
+    case class Atom(s: String) extends Sym
+    case class Scoped(s1: Atom, ss: Sym) extends Sym
   }
-  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S] {
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) = copy()(stage2)
-  }
+
+  case class Str[S <: Stage](s: String)(implicit val stage: S) extends Terminal[S]
 
   case class Lst[S <: Stage](
     elems: List[Node[S]]
   )(implicit val stage: S
-  ) extends Node[S] {
-    def children = elems
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
-      copy(elems map f)(stage2)
-  }
+  ) extends Node[S]
 
-  case class Pair[S <: Stage](key: Str[S], value: Node[S]) extends Node[S] {
-    def children = List(key, value)
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
-      copy(f(key), f(value))(stage2)
-  }
+  case class Pair[S <: Stage](
+    key: Sym.Atom,
+    value: Node[S]
+  )(implicit val stage: S
+  ) extends Node[S]
+
   case class Dict[S <: Stage](
     pairs: List[Pair[S]]
   )(implicit val stage: S
-  ) extends Node[S] {
-    def children = pairs
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
-      copy(pairs map f)(stage2)
+  ) extends Node[S]
+
+  sealed trait Func[S <: Stage, T <: Stage] extends Node[S]
+  object Func {
+    case class Base[S <: Stage, T <: Stage](
+      arg: Str[S],
+      // a function's body isn't resolved until after the arg is substituted
+      // so, its stage lags behind the rest of the func
+      body: Node[T]
+    )(implicit val stage: S
+    ) extends Func[S, T]
+
+    case class Deferred[S <: Stage, T <: Stage](
+      prior: Node[S],
+      f: Func[S, T]
+    ) extends Func[S, T] {
+      val stage = f.stage
+    }
   }
 
-  case class Func[S <: Stage](
-    args: List[Str[S]],
-    body: Node[S]
-  )(implicit val stage: S
-  ) extends Node[S] {
-    def children = body :: args
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
-      copy(args map f, f(body))(stage2)
-  }
 
   case class Merged[S <: Stage](
     nodes: List[Node[S]]
   )(implicit val stage: S
-  ) extends Node[S] {
-    def children = nodes
-    def copyMap[T <: Stage](stage2: T)(f: Node[S] => Node[T]) =
-      copy(nodes map f)(stage2)
-  }
+  ) extends Node[S]
 }
 
 object Parsers {
@@ -86,8 +85,8 @@ class Parsers extends RegexParsers {
   override val skipWhitespace = false
 
   def apply(s: String): Try[Node[P]] = parseAll(fcon, s) match {
-    case Success(result, _) => Return(result)
-    case failure => Throw(new ParsingError(s"Error parsing string: $failure"))
+    case Success(result, _) => Return(result) 
+   case failure => Throw(new ParsingError(s"Error parsing string: $failure"))
   }
 
   def fcon: Parser[Node[P]] = s ~> expr <~ s
@@ -100,15 +99,23 @@ class Parsers extends RegexParsers {
 
   def atom: Parser[Node[P]] = list | dict | func | string | sym
 
-  def sym: Parser[Sym[P]] = "`" ~> "[^`]*".r <~ "`" ^^ { Sym(_) }
+  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]*".r, ".") <~ "`" ^^ {
+    parts => parts.init.foldRight(Sym.Atom(parts.last): Sym) {
+      (part, chain) => Sym.Scoped(Sym.Atom(part), chain)
+    }
+  }
+
   def list: Parser[Lst[P]] = "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
   def dict: Parser[Dict[P]] = "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
   def pair: Parser[Pair[P]] = string ~ (s ~> ":" ~> s ~> expr) ^^ {
-    case key ~ value => Pair(key, value)
+    case Str(key) ~ value => Pair(Sym.Atom(key), value)
   }
-  def func: Parser[Func[P]] =
+  def func: Parser[Func[P, P]] =
     ( "(" ~> rep1sep( s ~> string, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
-      case args ~ body => Func(args, body)
+      case args ~ body =>
+        args.init.foldLeft(Func.Base(args.last, body)) {
+          case (f, argI) => Func.Base(argI, f)
+        }
     }
 
   def implComma: Parser[String] = "," | "\n"
