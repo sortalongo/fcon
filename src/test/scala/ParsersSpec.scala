@@ -2,17 +2,19 @@ package co.sortalon.fcon
 
 import Parsers.Parsed
 import AST._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import org.scalatest.prop.PropertyChecks
 import scala.language.postfixOps
 
-class ParsersSpec extends FlatSpec
+class ParsersSpec extends FunSuite
     with Matchers
     with PropertyChecks {
 
   val parser = new Parsers
 
-  "Parsers" should "detect implied strings" in {
+  //  test("arbitrary JSON leads to a successful parse")
+  
+  test("nonempty strings with no reserved chars are implied strings") {
     forAll { (s: String) =>
       val reserved = s"[${Parsers.reservedChars}${Parsers.quoteChars}\n\r]".r
       val hasReservedChar = reserved.findFirstIn(s).isDefined
