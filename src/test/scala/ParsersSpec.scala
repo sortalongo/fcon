@@ -13,7 +13,7 @@ class ParsersSpec extends FunSuite
   val parser = new Parsers
 
   //  test("arbitrary JSON leads to a successful parse")
-  
+
   test("nonempty strings with no reserved chars are implied strings") {
     forAll { (s: String) =>
       val reserved = s"[${Parsers.reservedChars}${Parsers.quoteChars}\n\r]".r
@@ -29,13 +29,13 @@ class ParsersSpec extends FunSuite
     }
   }
 
-  it should "parse a list" in {
+  test("parse a list") {
     val eg = " [ 1, 2, 3 ] "
     val ast = parser(eg).get
     ast shouldEqual Lst(1 to 3 map { i => Str(i.toString) } toList)
   }
 
-  it should "parse a dict" in {
+  test("parse a dict") {
     val eg = " { foo: too, bar: har } "
     val ast = parser(eg).get
     ast shouldEqual Dict(
@@ -44,7 +44,7 @@ class ParsersSpec extends FunSuite
     )
   }
 
-  it should "parse a function" in {
+  test("parse a function") {
     val eg = "(x,y, z: `x` `y` `z`) "
     val ast = parser(eg).get
     ast shouldEqual Func.Base(Str("x"),
@@ -54,7 +54,7 @@ class ParsersSpec extends FunSuite
         )))
   }
 
-  it should "obey order of operations with parens" in {
+  test("obey order of operations with parens") {
     val eg = """
       [ 1, 2, 3] (arg1, arg2: `arg2` `arg1`)
       ({ foo: too, bar: har } plus)
