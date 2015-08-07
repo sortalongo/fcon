@@ -6,7 +6,7 @@ import scala.util.Try
 
 object Resolver {
   case class Resolved(
-    scope: Scope = Scope.Empty
+    scope: Scope[Node[Resolved]] = Scope.Empty
   ) extends Stage
   type R = Resolved
 
@@ -17,7 +17,7 @@ object Resolver {
 
   private[fcon] def resolve(
     node: Node[P],
-    scope: Scope
+    scope: Scope[Node[R]]
   ): Node[R] = node match {
 
     // Strs are the simple base case: they are constants that do not need to be resolved.

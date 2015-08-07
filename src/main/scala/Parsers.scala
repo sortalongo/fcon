@@ -23,6 +23,9 @@ object AST {
         case (part, chain) => Scoped(Atom(part), chain)
       }
     }
+    def rooted(s: String*) = Root(apply(s: _*))
+
+    case class Root(s: Sym) extends Sym
     case class Atom(s: String) extends Sym
     case class Scoped(s1: Atom, ss: Sym) extends Sym
   }
