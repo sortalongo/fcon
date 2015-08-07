@@ -69,7 +69,7 @@ object Generators {
     val climb = arbitrary[Int].map(Climb(_))
 
     val ops: Gen[List[Op]] = Gen.listOf(
-      Gen.frequency(3 -> bind, 2 -> bind, 1 -> climb)
+      Gen.frequency(1 -> bind, 3 -> branch, 2 -> climb)
     )
     implicit val arbOps = Arbitrary(ops)
 

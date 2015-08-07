@@ -10,8 +10,8 @@ sealed trait Scope[T] {
   def branch(sym: Sym.Atom): Scope[T]
   def climb(node: T): Scope[T]
 
-  protected def map: Map[Sym.Atom, T]
-  protected def children: Map[Sym.Atom, Scope.Tree[T]]
+  def map: Map[Sym.Atom, T]
+  def children: Map[Sym.Atom, Scope.Tree[T]]
 
 }
 
