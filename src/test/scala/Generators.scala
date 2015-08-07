@@ -9,7 +9,7 @@ object Generators {
   val nonemptyString: Gen[String] =
     Gen.nonEmptyContainerOf[Array,Char](arbitrary[Char]).map(_.mkString)
 
-  object AST {
+  object ASTs {
 
     val atom: Gen[Sym.Atom] = for (str <- nonemptyString) yield Sym.Atom(str)
     val sym: Gen[Sym] = for (strs <- Gen.listOf(nonemptyString)) yield Sym(strs: _*)
@@ -46,5 +46,34 @@ object Generators {
 
     val node: Gen[Node[P]] = Gen.oneOf(str, lst, dict, func, merged)
     implicit val arbNode = Arbitrary(node)
+  }
+
+  object Scopes {
+    sealed trait Op
+    case class Branch(sym: Sym.Atom) extends Op
+    case class Bind(sym: Sym.Atom, i: Int) extends Op
+    case class Climb(i: Int) extends Op
+
+    def fold(ops: List[Op], scope: Scope[Option[Int]] = Scope.Empty): Scope[Option[Int]] = ops match {
+      case Nil => scope
+      case Branch(sym) :: tail => fold(tail, scope.branch(sym))
+      case Climb(i) :: tail => fold(tail, scope.climb(Some(i)))
+      case Bind(sym, i) :: tail => fold(tail, scope.bind(sym, Some(i)))
+    }
+
+    val branch = ASTs.atom.map(Branch(_))
+    val bind = for {
+      sym <- ASTs.atom
+      i <- arbitrary[Int]
+    } yield Bind(sym, i)
+    val climb = arbitrary[Int].map(Climb(_))
+
+    val ops: Gen[List[Op]] = Gen.listOf(
+      Gen.frequency(3 -> bind, 2 -> bind, 1 -> climb)
+    )
+    implicit val arbOps = Arbitrary(ops)
+
+    val scope: Gen[Scope[Option[Int]]] = ops.map(ops => fold(ops))
+    implicit val arbScope = Arbitrary(scope)
   }
 }
