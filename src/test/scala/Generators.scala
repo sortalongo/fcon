@@ -19,6 +19,8 @@ object Generators {
     def addScope(scope: ScopeNP) = { n: Node[P] => (n, scope) }
     val dropScope = { (n: Node[P], s: ScopeNP) => n }.tupled
 
+    val maxLength = 10
+
     val atom: Gen[Sym.Atom] = for (str <- nonemptyString) yield Sym.Atom(str)
     val sym: Gen[Sym] = for (strs <- Gen.listOf(nonemptyString)) yield Sym(strs: _*)
 
@@ -42,7 +44,8 @@ object Generators {
     implicit val arbStr = Arbitrary(str)
 
     def lst(scope: ScopeNP): Gen[Lst[P]] = for {
-      nodes <- Gen.listOf(node(scope))
+      size <- Gen.choose(1, maxLength)
+      nodes <- Gen.listOfN(size, node(scope))
     } yield Lst(nodes.map(_._1))
     val lst_ = lst(Scope.Empty)
     implicit val arbLst = Arbitrary(lst_)
@@ -53,8 +56,8 @@ object Generators {
     } yield (Pair(key, value), scope2.climb(value))
 
 
-    def dict(scope: ScopeNP): Gen[(Dict[P], ScopeNP)] = Gen.sized { size =>
-      val pairsGen =  foldGen((List.empty[Pair[P]], scope), (0 until size)) { (accum, _) =>
+    def dict(scope: ScopeNP): Gen[(Dict[P], ScopeNP)] = Gen.choose(1, maxLength).flatMap { size =>
+      val pairsGen = foldGen((List.empty[Pair[P]], scope), (0 until size)) { (accum, _) =>
         val (pairs, scope2) = accum
         for {
           (pair, scope3) <- pair(scope2)
@@ -80,9 +83,9 @@ object Generators {
     val func_ = func(Scope.Empty)
     implicit val arbFunc = Arbitrary(func_)
 
-    def merged(scope: ScopeNP): Gen[Merged[P]] = {
+    def merged(scope: ScopeNP): Gen[Merged[P]] = Gen.choose(1, maxLength).flatMap { size =>
       val node_ = node(scope)
-      for (nodes <- Gen.listOf(node_)) yield Merged(nodes.map(dropScope))
+      for (nodes <- Gen.listOfN(size, node_)) yield Merged(nodes.map(dropScope))
     }
     val merged_ = merged(Scope.Empty)
     implicit val arbMerged = Arbitrary(merged_)
@@ -97,10 +100,14 @@ object Generators {
         () => func(scope).map(add),
         () => merged(scope).map(add)
       )
-      for {
+      val anyGen = for {
         argFn <- Gen.oneOf(lazyArgs)
         arg <- argFn()
       } yield arg
+      Gen.frequency(
+        1 -> str.map(add),
+        1 -> anyGen
+      )
     }
     val node_ = node(Scope.Empty)
     implicit val arbNode = Arbitrary(node_)
