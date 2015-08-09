@@ -56,11 +56,10 @@ object Resolver {
       Dict(reversedDict.pairs.reverse)(reversedDict.stage)
 
     case f: Func.Base[P, P]@unchecked =>
-      val r = Resolved(scope)
       Func.Base[R, P](
-        f.arg.copy()(r),
+        f.arg,
         f.body
-      )(r)
+      )(Resolved(scope))
 
     case _ =>
       throw new ResolutionError(s"Resolving invalid node $node")

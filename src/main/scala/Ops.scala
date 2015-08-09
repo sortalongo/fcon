@@ -89,11 +89,8 @@ object Ops {
     case Func.Deferred(left, subFunc) =>
       merge(left, applyFunc(subFunc, right))
     case Func.Base(arg, body) =>
-      implicit val stage = f.stage
-      val argSym = Sym.Atom(arg.s)
-
       // bind the function's substitution inside the function's scope
-      val newScope = stage.scope.bind(argSym, right)
+      val newScope = f.stage.scope.bind(arg, right)
       // resolve the function body with the new binding
       Resolver.resolve(body, newScope)
   }

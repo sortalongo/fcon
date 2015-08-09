@@ -27,7 +27,6 @@ object Scope {
   ) extends Scope[T] {
     def apply(sym: Sym) =  sym match {
       case s: Sym.Atom => map.get(s)
-      case Sym.Root(tail) => apply(tail)
       case Sym.Scoped(head, tail) => children.get(head).flatMap {
         child => child(tail)
       }
@@ -48,10 +47,7 @@ object Scope {
     map: Map[Sym.Atom, T] = Map.empty[Sym.Atom, T],
     children: Map[Sym.Atom, Tree[T]] = Map.empty[Sym.Atom, Tree[T]]
   ) extends Scope[T] {
-    def apply(sym: Sym) = sym match {
-      case Sym.Root(_) => parent(sym)
-      case _ => toTree(sym).orElse(parent(sym))
-    }
+    def apply(sym: Sym) = toTree(sym).orElse(parent(sym))
 
     def bind(
       name: Sym.Atom,
@@ -61,9 +57,13 @@ object Scope {
     def branch(sym: Sym.Atom) = Embedded[T](sym, this)
     def climb(node: T) = parent match {
       case Tree(m2, ch2) =>
-        Tree[T](m2, ch2 + (symbol -> toTree))
+        Tree[T](
+          m2 + (symbol -> node),
+          ch2 + (symbol -> toTree))
       case Embedded(sym2, p2, m2, ch2) =>
-        Embedded[T](sym2, p2, m2, ch2 + (symbol -> toTree))
+        Embedded[T](sym2, p2,
+          m2 + (symbol -> node),
+          ch2 + (symbol -> toTree))
     }
     private def toTree = Tree[T](map, children)
   }

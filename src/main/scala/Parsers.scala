@@ -19,13 +19,13 @@ object AST {
   object Sym {
     def apply(s: String*) = s match {
       case Seq(atom) => Atom(atom)
-      case scoped => scoped.init.foldRight(Atom(scoped.last): Sym) {
-        case (part, chain) => Scoped(Atom(part), chain)
-      }
+      case _ => sub(Atom(s.last), s.init)
     }
-    def rooted(s: String*) = Root(apply(s: _*))
 
-    case class Root(s: Sym) extends Sym
+    def sub(sym: Sym, prefix: Seq[String]) = prefix.foldRight(sym) {
+      case (part, chain) => Scoped(Atom(part), chain)
+    }
+
     case class Atom(s: String) extends Sym
     case class Scoped(s1: Atom, ss: Sym) extends Sym
   }
@@ -51,7 +51,7 @@ object AST {
   sealed trait Func[S <: Stage, T <: Stage] extends Node[S]
   object Func {
     case class Base[S <: Stage, T <: Stage](
-      arg: Str[S],
+      arg: Sym.Atom,
       // a function's body isn't resolved until after the arg is substituted
       // so, its stage lags behind the rest of the func
       body: Node[T]
@@ -62,7 +62,7 @@ object AST {
       prior: Node[S],
       f: Func[S, T]
     ) extends Func[S, T] {
-      val stage = f.stage
+      def stage = f.stage
     }
   }
 
@@ -108,7 +108,8 @@ class Parsers extends RegexParsers {
 
   def atom: Parser[Node[P]] = list | dict | func | string | sym
 
-  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]*".r, ".") <~ "`" ^^ { Sym(_: _*) }
+  def symatom: Parser[Sym.Atom] = "`" ~> "[^`]+" <~ "`" ^^ { Sym.Atom(_) }
+  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]+".r, ".") <~ "`" ^^ { Sym(_: _*) }
 
   def list: Parser[Lst[P]] = "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
   def dict: Parser[Dict[P]] = "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
@@ -116,7 +117,7 @@ class Parsers extends RegexParsers {
     case Str(key) ~ value => Pair(Sym.Atom(key), value)
   }
   def func: Parser[Func[P, P]] =
-    ( "(" ~> rep1sep( s ~> string, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
+    ( "(" ~> rep1sep( s ~> symatom, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
       case args ~ body =>
         args.init.foldRight(Func.Base(args.last, body)) {
           case (arg, f) => Func.Base(arg, f)
