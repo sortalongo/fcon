@@ -89,11 +89,18 @@ object Generators {
 
     def node(scope: ScopeNP): Gen[(Node[P], ScopeNP)] = {
       val add = addScope(scope)
-      val scStr = str.map(add)
-      val scLst = lst(scope).map(add)
-      val scFunc = func(scope).map(add)
-      val scMerged = merged(scope).map(add)
-      Gen.oneOf(scStr, scLst, dict(scope), scFunc, scMerged)
+      // pack generators into functions to avoid infinite recursion
+      val lazyArgs = List(
+        () => str.map(add),
+        () => lst(scope).map(add),
+        () => dict(scope),
+        () => func(scope).map(add),
+        () => merged(scope).map(add)
+      )
+      for {
+        argFn <- Gen.oneOf(lazyArgs)
+        arg <- argFn()
+      } yield arg
     }
     val node_ = node(Scope.Empty)
     implicit val arbNode = Arbitrary(node_)
