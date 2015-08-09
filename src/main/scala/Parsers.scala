@@ -108,11 +108,15 @@ class Parsers extends RegexParsers {
 
   def atom: Parser[Node[P]] = list | dict | func | string | sym
 
-  def symatom: Parser[Sym.Atom] = "`" ~> "[^`]+" <~ "`" ^^ { Sym.Atom(_) }
-  def sym: Parser[Sym] = "`" ~> rep1sep("[^`]+".r, ".") <~ "`" ^^ { Sym(_: _*) }
+  def symatom: Parser[Sym.Atom] =
+    optEnclosed("`") ^^ { Sym.Atom(_) }
+  def sym: Parser[Sym] =
+    "`" ~> rep1sep("[^`]+".r, ".") <~ "`" ^^ { Sym(_: _*) }
 
-  def list: Parser[Lst[P]] = "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
-  def dict: Parser[Dict[P]] = "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
+  def list: Parser[Lst[P]] =
+    "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
+  def dict: Parser[Dict[P]] =
+    "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
   def pair: Parser[Pair[P]] = string ~ (s ~> ":" ~> s ~> expr) ^^ {
     case Str(key) ~ value => Pair(Sym.Atom(key), value)
   }
@@ -126,5 +130,8 @@ class Parsers extends RegexParsers {
 
   def implComma: Parser[String] = "," | "\n"
   def string: Parser[Str[P]] =
-    ( "\"" ~> "[^\"]".r <~ "\"" | unreserved ) ^^ { s: String => Str(s.trim) }
+    optEnclosed("\"") ^^ { s: String => Str(s.trim) }
+
+  def optEnclosed(sep: String): Parser[String] =
+    sep ~> s"[^$sep]".r <~ sep | unreserved
 }

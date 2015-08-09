@@ -47,9 +47,9 @@ class ParsersSpec extends FunSuite
   test("parse a function") {
     val eg = "(x,y, z: `x` `y` `z`) "
     val ast = parser(eg).get
-    ast shouldEqual Func.Base(Str("x"),
-      Func.Base(Str("y"),
-        Func.Base(Str("z"),
+    ast shouldEqual Func.Base(Sym.Atom("x"),
+      Func.Base(Sym.Atom("y"),
+        Func.Base(Sym.Atom("z"),
           Merged(List(Sym("x"), Sym("y"), Sym("z")))
         )))
   }
@@ -62,8 +62,8 @@ class ParsersSpec extends FunSuite
     val ast = parser(eg).get
     ast shouldEqual Merged(
       Lst(1 to 3 map { i => Str(i.toString) } toList) ::
-        Func.Base(Str("arg1"),
-          Func.Base(Str("arg2"),
+        Func.Base(Sym.Atom("arg1"),
+          Func.Base(Sym.Atom("arg2"),
             Merged(Sym("arg2") :: Sym("arg1") :: Nil)
         )) ::
         Merged(
