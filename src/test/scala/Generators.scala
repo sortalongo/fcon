@@ -4,6 +4,7 @@ import AST._
 import Parsers.{P, Parsed}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Arbitrary.arbitrary
+import scalaz.State
 
 object Generators {
   val nonemptyString: Gen[String] =
@@ -15,39 +16,50 @@ object Generators {
   }
 
   object ASTs {
-    type ScopeNP = Scope[Node[P]]
-    def addScope(scope: ScopeNP) = { n: Node[P] => (n, scope) }
-    val dropScope = { (n: Node[P], s: ScopeNP) => n }.tupled
+    import StateGen.{StateGen, monad}
 
+    type ScopeNP = Scope[Node[P]]
+    type State = (Int, ScopeNP)
+
+    val ops = StateGen.monad[State]
+    import ops.{get, modify, replicateM}
+    import ops.{liftM}
+
+    val seedSize = 50
     val maxLength = 10
 
     val atom: Gen[Sym.Atom] = for (str <- nonemptyString) yield Sym.Atom(str)
     val sym: Gen[Sym] = for (strs <- Gen.listOf(nonemptyString)) yield Sym(strs: _*)
 
-    def pickSym(scope: ScopeNP): Gen[Sym] = {
+    val pickSym = State[(Int, ScopeNP), Gen[Sym]] ({ (size, scope) =>
       val here = Gen.oneOf(scope.map.map { case (sym, _) => sym }.toSeq )
       val below = for {
         (pfx, scope) <- Gen.oneOf(scope.children.toSeq)
         sym <- pickSym(scope)
       } yield Sym.Scoped(pfx, sym)
 
-      scope match {
+      val gen = scope match {
         case _: Scope.Tree[_] =>
           Gen.oneOf(here, below)
         case e: Scope.Embedded[Node[P]] @ unchecked =>
           val above = pickSym(e.parent)
           Gen.oneOf(above, here, below)
       }
-    }
+      ((size - 1, scope), gen)
+    }.tupled)
     
-    val str: Gen[Str[P]] = for (str <- nonemptyString) yield Str(str)
-    implicit val arbStr = Arbitrary(str)
+    val str = State[(Int, ScopeNP), Gen[Str[P]]] ({ (size, scope) =>
+      val gen = for (str <- nonemptyString) yield Str(str)
+      ((size - 1, scope), gen)
+    }.tupled)
+    implicit val arbStr = Arbitrary(str.eval((1, Scope.Empty)))
 
-    def lst(scope: ScopeNP): Gen[Lst[P]] = for {
-      size <- Gen.choose(1, maxLength)
-      nodes <- Gen.listOfN(size, node(scope))
-    } yield Lst(nodes.map(_._1))
-    val lst_ = lst(Scope.Empty)
+    val lst: StateGen[State, Lst[P]] = for {
+      (size, _) <- get
+      count <- liftM(Gen.choose(0, maxLength min size))
+      nodes <- replicateM(count, node)
+    } yield Lst(nodes)
+    val lst_ = lst.eval((seedSize, Scope.Empty))
     implicit val arbLst = Arbitrary(lst_)
 
     def pair(scope: ScopeNP): Gen[(Pair[P], ScopeNP)] = for {
