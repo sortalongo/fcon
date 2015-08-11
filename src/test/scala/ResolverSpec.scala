@@ -10,6 +10,5 @@ import scala.util.Success
 class ResolverSpec extends FunSuite
     with Matchers
     with PropertyChecks {
-  // test("an AST with no symbols is unchanged by resolution")
   // test("a resolved AST has no Merged or Func nodes")
 }
