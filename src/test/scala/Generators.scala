@@ -23,7 +23,7 @@ object Generators {
     type ScopeNP = Scope[Node[P]]
     type State = (Int, ScopeNP)
 
-    def maxLength(quota: Int) = quota min 10 max 1
+    def maxLength(quota: Int) = quota min 10 max 0
 
     // Generators and Arbitrary instances
 
@@ -57,7 +57,7 @@ object Generators {
 
     val decrement = for {
       _ <- modify( { (i: Int, s: ScopeNP) =>
-        println(s"decrementing $i")
+        print(s"$i ")
         (i - 1, s)
       }.tupled )
       s <- get
@@ -103,7 +103,7 @@ object Generators {
     val lstSG: StateGen[State, Lst[P]] = for {
       st <- decrement
       (size, _) = st
-      count <- liftM(Gen.choose(1, maxLength(size)))
+      count <- liftM(Gen.choose(0, maxLength(size)))
       nodes <- replicateM(count, nodeSG)
     } yield Lst(nodes)
 
@@ -118,7 +118,7 @@ object Generators {
     val dictSG: StateGen[State, Dict[P]] = for {
       st <- decrement
       (size, _) = st
-      n <- liftM(Gen.choose(1, maxLength(size)))
+      n <- liftM(Gen.choose(0, maxLength(size)))
       pairs <- replicateM(n, pairSG)
     } yield Dict(pairs)
 
@@ -139,13 +139,13 @@ object Generators {
     val mergedSG: StateGen[State, Merged[P]] = for {
       st <- get
       (size, _) = st
-      n <- liftM(Gen.choose(1, maxLength(size)))
+      n <- liftM(Gen.choose(0, maxLength(size)))
       nodes <- replicateM(n, nodeSG)
     } yield Merged(nodes)
 
     val nodeSG: StateGen[State, Node[P]] = for {
       choice <- liftM(Gen.frequency(
-        3 -> cast(strSG),
+        5 -> cast(strSG),
 //        1 -> cast(pickSym),
         1 -> cast(lstSG),
         1 -> cast(dictSG),

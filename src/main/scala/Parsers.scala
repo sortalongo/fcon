@@ -78,6 +78,7 @@ object Parsers {
   val quoteChars = "\"'"
 
   val s = "\\s*".r
+  val s_n = """[ \t\x0B\f\r]*""".r
   val newline = "[\r\n]+".r
   val unreserved = s"""[^${reservedChars}${quoteChars}\r\n]+""".r
 
@@ -94,17 +95,17 @@ class Parsers extends RegexParsers {
   override val skipWhitespace = false
 
   def apply(s: String): Try[Node[P]] = parseAll(fcon, s) match {
-    case Success(result, _) => Return(result) 
+    case Success(result, _) => Return(result)
    case failure => Throw(new ParsingError(s"Error parsing string: $failure"))
   }
 
   def fcon: Parser[Node[P]] = s ~> expr <~ s
 
-  def expr: Parser[Node[P]] = rep1sep(atom | parens, s) ^^ {
+  def expr: Parser[Node[P]] = rep1sep(atom | parens, s_n) ^^ {
     case List(single) => single
     case multi @ List(_*) => Merged(multi)
   }
-  def parens: Parser[Node[P]] = "(" ~> s ~> expr <~ s <~ ")"
+  def parens: Parser[Node[P]] = s ~> "(" ~> s ~> expr <~ s <~ ")"
 
   def atom: Parser[Node[P]] = list | dict | func | string | sym
 
@@ -114,24 +115,24 @@ class Parsers extends RegexParsers {
     "`" ~> rep1sep("[^`]+".r, ".") <~ "`" ^^ { Sym(_: _*) }
 
   def list: Parser[Lst[P]] =
-    "[" ~> repsep(s ~> expr <~ s, implComma) <~ s <~ "]" ^^ { Lst(_) }
+    "[" ~> repsep(expr, implComma) <~ s <~ "]" ^^ { Lst(_) }
   def dict: Parser[Dict[P]] =
-    "{" ~> repsep(s ~> pair <~ s, implComma) <~ s <~ "}" ^^ { Dict(_) }
+    "{" ~> s ~>repsep(pair, implComma) <~ s <~ "}" ^^ { Dict(_) }
   def pair: Parser[Pair[P]] = string ~ (s ~> ":" ~> s ~> expr) ^^ {
     case Str(key) ~ value => Pair(Sym.Atom(key), value)
   }
   def func: Parser[Func[P, P]] =
-    ( "(" ~> rep1sep( s ~> symatom, ",") <~ s ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
+    ( "(" ~> rep1sep( s ~> symatom <~ s, ",") ) ~ ( ":" ~> s ~> expr <~ s <~ ")" ) ^^ {
       case args ~ body =>
         args.init.foldRight(Func.Base(args.last, body)) {
           case (arg, f) => Func.Base(arg, f)
         }
     }
 
-  def implComma: Parser[String] = "," | "\n"
+  def implComma: Parser[String] = "," | s_n ~> "\n"
   def string: Parser[Str[P]] =
     optEnclosed("\"") ^^ { s: String => Str(s.trim) }
 
   def optEnclosed(sep: String): Parser[String] =
-    sep ~> s"[^$sep]".r <~ sep | unreserved
+    (sep ~> s"[^$sep]+".r <~ sep | unreserved) ^^ { _.trim }
 }
