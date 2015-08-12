@@ -17,43 +17,52 @@ object Generators {
 
   object ASTs {
     import StateGen.{StateGen, monad, trans}
+    import scalaz.Functor
+    import scalaz.scalacheck.ScalaCheckBinding.GenMonad
 
     type ScopeNP = Scope[Node[P]]
     type State = (Int, ScopeNP)
 
-    val maxLength = 10
+    def maxLength(quota: Int) = quota min 10 max 1
 
     // Generators and Arbitrary instances
 
-    val atom: Gen[Sym.Atom] = for (str <- nonemptyString) yield Sym.Atom(str)
-    val sym: Gen[Sym] = for (strs <- Gen.listOf(nonemptyString)) yield Sym(strs: _*)
+    lazy val atom: Gen[Sym.Atom] = for (str <- nonemptyString) yield Sym.Atom(str)
+    lazy val sym: Gen[Sym] = for (strs <- Gen.listOf(nonemptyString)) yield Sym(strs: _*)
 
-    val str: Gen[Str[P]] = evalZero(strSG)
-    implicit val arbStr = Arbitrary(str)
-    
-    val lst: Gen[Lst[P]] = evalZero(lstSG)
-    implicit val arbLst = Arbitrary(lst)
+    lazy val str: Gen[Str[P]] = evalZero(strSG)
+    lazy implicit val arbStr = Arbitrary(str)
 
-    val dict: Gen[Dict[P]] = evalZero(dictSG)
-    implicit val arbDict = Arbitrary(dict)
+    lazy val lst: Gen[Lst[P]] = evalZero(lstSG)
+    lazy implicit val arbLst = Arbitrary(lst)
 
-    val func: Gen[Func[P, P]] = evalZero(funcSG)
-    implicit val arbFunc = Arbitrary(func)
+    lazy val dict: Gen[Dict[P]] = evalZero(dictSG)
+    lazy implicit val arbDict = Arbitrary(dict)
 
-    val merged: Gen[Merged[P]] = evalZero(mergedSG)
-    implicit val arbMerged = Arbitrary(merged)
+    lazy val func: Gen[Func[P, P]] = evalZero(funcSG)
+    lazy implicit val arbFunc = Arbitrary(func)
 
-    val node: Gen[Node[P]] = evalZero(nodeSG)
-    implicit val arbNode = Arbitrary(node)
+    lazy val merged: Gen[Merged[P]] = evalZero(mergedSG)
+    lazy implicit val arbMerged = Arbitrary(merged)
+
+    lazy val node: Gen[Node[P]] = evalZero(nodeSG)
+    lazy implicit val arbNode = Arbitrary(node)
 
     // StateGen convenience imports and methods
-    import scalaz.scalacheck.ScalaCheckBinding.GenMonad
+
     val ops = monad[State]
-    import ops.{get, modify, replicateM}
+    import ops.{put, get, modify, replicateM}
     val opsT = trans[State]
     import opsT.{liftM}
 
-    val decrement = modify( { (i: Int, s: ScopeNP) => (i - 1, s) }.tupled )
+    val decrement = for {
+      _ <- modify( { (i: Int, s: ScopeNP) =>
+        println(s"decrementing $i")
+        (i - 1, s)
+      }.tupled )
+      s <- get
+    } yield s
+
     def branch(k: Sym.Atom) =
       modify( { (i: Int, s: ScopeNP) => (i, s.branch(k)) }.tupled )
     def climb(v: Node[P]) =
@@ -66,7 +75,7 @@ object Generators {
       Gen.sized { size => sg.eval((size, Scope.Empty)) }
 
     // Generator implementations
-
+/*
     val pickSym: StateGen[State, Sym] = for {
       _ <- decrement
       (size, scope) <- get
@@ -85,16 +94,16 @@ object Generators {
       }
       sym <- liftM(choice)
     } yield sym
-
+ */
     val strSG: StateGen[State, Str[P]] = for {
       _ <- decrement
-      s <- liftM(nonEmptyString)
-    } yield s
+      s <- liftM(nonemptyString)
+    } yield Str(s)
 
     val lstSG: StateGen[State, Lst[P]] = for {
-      _ <- decrement
-      (size, _) <- get
-      count <- liftM(Gen.choose(0, maxLength min size))
+      st <- decrement
+      (size, _) = st
+      count <- liftM(Gen.choose(1, maxLength(size)))
       nodes <- replicateM(count, nodeSG)
     } yield Lst(nodes)
 
@@ -107,15 +116,15 @@ object Generators {
     } yield Pair(key, value)
 
     val dictSG: StateGen[State, Dict[P]] = for {
-      _ <- decrement
-      (size, _) <- get
-      n <- liftM(Gen.choose(0, maxLength min size))
+      st <- decrement
+      (size, _) = st
+      n <- liftM(Gen.choose(1, maxLength(size)))
       pairs <- replicateM(n, pairSG)
     } yield Dict(pairs)
 
     val funcSG: StateGen[State, Func[P, P]] = for {
-      _ <- decrement
-      (_, scope) <- get
+      st <- decrement
+      (_, scope) = st
 
       arg <- liftM(atom)
       _ <- branch(arg)
@@ -124,19 +133,20 @@ object Generators {
       body <- choice
 
       // drop the branched scope so it doesn't leak out of the function
-      _ <- modify( { (size, _) => (size, scope) }.tupled )
-    } yield Func(arg, body)
+      _ <- modify( { (size: Int, _: ScopeNP) => (size, scope) }.tupled )
+    } yield Func.Base(arg, body)
 
     val mergedSG: StateGen[State, Merged[P]] = for {
-      (size, _) <- get
-      n <- liftM(Gen.choose(0, maxLength min size))
+      st <- get
+      (size, _) = st
+      n <- liftM(Gen.choose(1, maxLength(size)))
       nodes <- replicateM(n, nodeSG)
     } yield Merged(nodes)
 
     val nodeSG: StateGen[State, Node[P]] = for {
       choice <- liftM(Gen.frequency(
         3 -> cast(strSG),
-        1 -> cast(pickSym),
+//        1 -> cast(pickSym),
         1 -> cast(lstSG),
         1 -> cast(dictSG),
         1 -> cast(funcSG),
