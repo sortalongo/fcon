@@ -75,13 +75,13 @@ object Generators {
       Gen.sized { size => sg.eval((size, Scope.Empty)) }
 
     // Generator implementations
-/*
     val pickSym: StateGen[State, Sym] = for {
-      _ <- decrement
-      (size, scope) <- get
-      here = Gen.oneOf(scope.map.keys.toSeq)
+      st <- decrement
+      (size, scope) = st
+      here = liftM(Gen.oneOf(scope.map.keys.toSeq))
       below = for {
-        (pfx, scope) <- Gen.oneOf(scope.children.toSeq)
+        childPair <- liftM(Gen.oneOf(scope.children.toSeq))
+        (pfx, _) = childPair
         sym <- pickSym
       } yield Sym.Scoped(pfx, sym)
 
@@ -92,9 +92,10 @@ object Generators {
           val above = put((size, e.parent)).flatMap(_ => pickSym)
           Gen.oneOf(above, here, below)
       }
-      sym <- liftM(choice)
+      symMonad <- liftM(choice)
+      sym <- symMonad
     } yield sym
- */
+
     val strSG: StateGen[State, Str[P]] = for {
       _ <- decrement
       s <- liftM(nonemptyString)
@@ -146,7 +147,7 @@ object Generators {
     val nodeSG: StateGen[State, Node[P]] = for {
       choice <- liftM(Gen.frequency(
         5 -> cast(strSG),
-//        1 -> cast(pickSym),
+        1 -> cast(pickSym),
         1 -> cast(lstSG),
         1 -> cast(dictSG),
         1 -> cast(funcSG),
