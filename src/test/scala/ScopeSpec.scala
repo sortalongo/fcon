@@ -1,6 +1,7 @@
 package co.sortalon.fcon
 
 import AST._
+import generators.Scopes
 import org.scalatest.{FunSuite, Matchers}
 import org.scalatest.prop.PropertyChecks
 
@@ -8,7 +9,7 @@ class ScopeSpec extends FunSuite
     with Matchers
     with PropertyChecks {
 
-  import Generators.Scopes._
+  import Scopes._
   import ScopeSpec._
 
   test("scopes can find all unshadowed nodes") {

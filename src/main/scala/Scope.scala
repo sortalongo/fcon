@@ -13,6 +13,7 @@ sealed trait Scope[T] {
   def map: Map[Sym.Atom, T]
   def children: Map[Sym.Atom, Scope.Tree[T]]
 
+  def isEmpty: Boolean
 }
 
 object Scope {
@@ -39,6 +40,8 @@ object Scope {
 
     def branch(sym: Sym.Atom) = Embedded[T](sym, this)
     def climb(node: T) = this
+
+    def isEmpty = map.isEmpty && children.isEmpty
   }
 
   private[fcon] case class Embedded[T](
@@ -66,5 +69,7 @@ object Scope {
           ch2 + (symbol -> toTree))
     }
     private def toTree = Tree[T](map, children)
+
+    def isEmpty = map.isEmpty && children.isEmpty && parent.isEmpty
   }
 }
