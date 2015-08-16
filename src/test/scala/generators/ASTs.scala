@@ -93,10 +93,13 @@ object ASTs {
     val (size, scope) = state
     for {
       // generates a random bigint and uses it to create a composition
-      bytes <- liftM(Gen.containerOfN[Array, Byte](size, arbitrary[Byte]))
+      bytes <- liftM(Gen.containerOfN[Array, Byte](size / 8 + 1, arbitrary[Byte]))
       comp = composition(size, BigInt(bytes).abs)
       // maps state generators over composition, then sequences them
-      sgs = comp.map { part => put((part, scope)).flatMap(_ => sg) }
+      sgs = comp.map { part =>
+        modify( { (i: Int, s: ScopeNP) => (part, s) }.tupled )
+        .flatMap(_ => sg)
+      }
       nodes <- sequence(sgs)
     } yield nodes
   }
@@ -173,13 +176,13 @@ object ASTs {
   val nodeSG: StateGen[State, Node[P]] = for {
     st <- get
     (size, scope) = st
-    sym = if (scope.isEmpty) Nil else List((cast(pickSym)))
-    terminals = (cast(strSG)) :: sym
+    sym = if (scope.isEmpty) Nil else List(cast(pickSym))
+    terminals = cast(strSG) :: sym
     nodes = List(
-      (cast(lstSG)),
-      (cast(dictSG)),
-      (cast(funcSG)),
-      (cast(mergedSG))
+      cast(lstSG),
+      cast(dictSG),
+      cast(funcSG),
+      cast(mergedSG)
     )
     generators: List[StateGen[State, Node[P]]] = if (size > 1) nodes else terminals
     choice <- liftM(Gen.oneOf(generators))
