@@ -58,15 +58,20 @@ object Scope {
     ): Scope[T] = Embedded[T](symbol, parent, map + (name -> node), children)
 
     def branch(sym: Sym.Atom) = Embedded[T](sym, this)
-    def climb(node: T) = parent match {
-      case Tree(m2, ch2) =>
-        Tree[T](
-          m2 + (symbol -> node),
-          ch2 + (symbol -> toTree))
-      case Embedded(sym2, p2, m2, ch2) =>
-        Embedded[T](sym2, p2,
-          m2 + (symbol -> node),
-          ch2 + (symbol -> toTree))
+    def climb(node: T) = {
+      val map2 = parent.map + (symbol -> node)
+      val children2 = {
+        val tree = toTree
+        if (tree.isEmpty) parent.children
+        else parent.children + (symbol -> tree)
+      }
+
+      parent match {
+        case Tree(m2, ch2) =>
+          Tree[T](map2, children2)
+        case Embedded(sym2, p2, _, _) =>
+          Embedded[T](sym2, p2, map2, children2)
+      }
     }
     private def toTree = Tree[T](map, children)
 
