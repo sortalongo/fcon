@@ -52,7 +52,6 @@ object ASTs {
 
   val decrement = for {
     _ <- modify( { (i: Int, s: ScopeNP) =>
-      print(s"$i ")
       (i - 1, s)
     }.tupled )
     s <- get

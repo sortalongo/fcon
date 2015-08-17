@@ -63,6 +63,13 @@ object AST {
       f: Func[S, T]
     ) extends Func[S, T] {
       def stage = f.stage
+      def copy(stage: S): Deferred[S, T] = {
+        val fc = f match {
+          case b: Base[_,_] => b.copy()(stage)
+          case d: Deferred[_,_] => d.copy(stage)
+        }
+        Deferred(prior, fc)
+      }
     }
   }
 
