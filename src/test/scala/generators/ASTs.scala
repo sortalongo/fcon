@@ -57,6 +57,9 @@ object ASTs {
     s <- get
   } yield s
 
+  def withScope(s: ScopeNP) =
+    modify( { (i: Int, dropped: ScopeNP) => (i, s) }.tupled )
+
   def branch(k: Sym.Atom) =
     modify( { (i: Int, s: ScopeNP) => (i, s.branch(k)) }.tupled )
   def climb(v: Node[P]) =
@@ -139,7 +142,8 @@ object ASTs {
 
   val lstSG: StateGen[State, Lst[P]] = for {
     state <- decrement
-    nodes <- sequenceComposition(state, nodeSG)
+    (_, inScope) = state
+    nodes <- sequenceComposition(state, isolatedNodeSG(inScope))
   } yield Lst(nodes)
 
   val pairSG: StateGen[State, Pair[P]] = for {
@@ -164,12 +168,13 @@ object ASTs {
     body <- nodeSG
 
     // drop the branched scope so it doesn't leak out of the function
-    _ <- modify( { (size: Int, _: ScopeNP) => (size, scope) }.tupled )
+    _ <- withScope(scope)
   } yield Func.Base(arg, body)
 
   val mergedSG: StateGen[State, Merged[P]] = for {
     state <- get
-    nodes <- sequenceComposition(state, nodeSG)
+    (_, scope) = state
+    nodes <- sequenceComposition(state, isolatedNodeSG(scope))
   } yield Merged(nodes)
 
   val nodeSG: StateGen[State, Node[P]] = for {
@@ -187,5 +192,12 @@ object ASTs {
     choice <- liftM(Gen.oneOf(generators))
     node <- choice
   } yield node
+
+  // a node state generator that replaces the scope with the given one
+  // this effectively isolates the subtree so no other nodes will refer into it.
+  def isolatedNodeSG(scope: ScopeNP): StateGen[State, Node[P]] = for {
+    n <- nodeSG
+    _ <- withScope(scope)
+  } yield n
 }
 
