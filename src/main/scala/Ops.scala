@@ -23,7 +23,7 @@ object Ops {
   }
   // At this point, all symbols not inside functions have already been resolved
   private def merge(left: Node[R], right: Node[R]): Node[R] = (left, right) match {
-    case (_, f: Func.Base[R, P]@unchecked) => Func.Deferred[R, P](left, f)
+    case (_, f: Func[R, P]@unchecked) => Func.Deferred[R, P](left, f)
     case (s: Str[_], _) => mergeString(s, right)
     case (l: Lst[_], _) => mergeList(l, right, merge(_, right))
     case (d: Dict[_], _) => mergeDict(d, right, merge(_, right))
