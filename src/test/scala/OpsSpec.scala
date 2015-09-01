@@ -1,5 +1,6 @@
 package co.sortalon.fcon
 
+import org.scalacheck.Gen
 import org.scalatest.{FunSuite, Matchers}
 import org.scalatest.prop.PropertyChecks
 import scala.util.Success
@@ -27,7 +28,7 @@ class OpsSpec extends FunSuite
   // test("a string on the left ends up at the beginning of every element")
 
   test("a list merged with a non-list has n elements") {
-    forAll { (l: Lst[P], n: Node[P]) =>
+    forAll(lst, Gen.oneOf(str, dict)) { (l: Lst[P], n: Node[P]) =>
       val toMerge = List(l, n).map {
         x => Resolver(x).get
       }
