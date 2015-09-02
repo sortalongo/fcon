@@ -31,7 +31,7 @@ object Resolver {
       val result = scope(s).getOrElse {
         throw new OutOfScopeError(s"$s not found in scope $scope")
       }
-      copy(result, Resolved(scope))
+      AST.copy(result, Resolved(scope))
 
     // Lists simply pass on their scope to their elements
     case Lst(elems) =>
@@ -48,8 +48,8 @@ object Resolver {
           val inScope = dict.stage.scope
 
           val resolvedV = resolve(v, inScope.branch(k))
-          val Resolved(resolvedScope) = resolvedV.stage
-          val outPair = Pair(k, resolvedV)(Resolved(resolvedScope))
+          val resStage @ Resolved(resolvedScope) = resolvedV.stage
+          val outPair = Pair(k, resolvedV)(resStage)
 
           val outScope = resolvedScope.climb(resolvedV)
           Dict(outPair :: dict.pairs)(Resolved(outScope))
@@ -64,15 +64,5 @@ object Resolver {
 
     case _ =>
       throw new ResolutionError(s"Resolving invalid node $node")
-  }
-
-  private[fcon] def copy(in: Node[R], stage: Resolved): Node[R] = in match {
-    case s: Str[_] => s.copy()(stage)
-    case l: Lst[_] => l.copy()(stage)
-    case p: Pair[_] => p.copy()(stage)
-    case d: Dict[_] => d.copy()(stage)
-    case f: Func.Base[_, _] => f.copy()(stage)
-    case df: Func.Deferred[_, _] => df.copy(stage)
-    case m: Merged[_] => m.copy()(stage)
   }
 }

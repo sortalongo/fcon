@@ -68,16 +68,25 @@ object AST {
           case b: Base[_,_] => b.copy()(stage)
           case d: Deferred[_,_] => d.copy(stage)
         }
-        Deferred(prior, fc)
+        Deferred(AST.copy(prior, stage), fc)
       }
     }
   }
-
 
   case class Merged[S <: Stage](
     nodes: List[Node[S]]
   )(implicit val stage: S
   ) extends Node[S]
+
+  private[fcon] def copy[S <: Stage](in: Node[S], stage: S): Node[S] = in match {
+    case s: Str[_] => s.copy()(stage)
+    case l: Lst[_] => l.copy()(stage)
+    case p: Pair[_] => p.copy()(stage)
+    case d: Dict[_] => d.copy()(stage)
+    case f: Func.Base[_, _] => f.copy()(stage)
+    case df: Func.Deferred[_, _] => df.copy(stage)
+    case m: Merged[_] => m.copy()(stage)
+  }
 }
 
 object Parsers {

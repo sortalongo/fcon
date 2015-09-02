@@ -12,6 +12,9 @@ object Ops {
 
   @tailrec
   def merge(nodes: List[Node[R]]): Try[Node[R]] = nodes match {
+    // FEATURE: scopes into fully-resolved scopes
+    // we must access the scope of the parent of the merge, merging
+    // it with the results of the merge.
     case Nil => Failure(new MergeError(s"Unable to merge empty list"))
     case elem :: Nil => Success(elem)
     case fst :: snd :: rest =>
